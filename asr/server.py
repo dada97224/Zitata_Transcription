@@ -30,16 +30,43 @@ app.add_middleware(
 )
 
 
+def detect_device() -> str:
+    """Détecte le meilleur device disponible : cuda > mps > cpu."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            name = torch.cuda.get_device_name(0)
+            vram = torch.cuda.get_device_properties(0).total_mem / 1e9
+            logger.info(f"GPU CUDA détecté : {name} ({vram:.1f} Go VRAM)")
+            return "cuda"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            logger.info("Apple MPS détecté (Mac M-series)")
+            return "mps"
+    except ImportError:
+        pass
+    logger.info("Pas de GPU — mode CPU (lent pour audio > 5 min)")
+    return "cpu"
+
+
 def load_parakeet():
     """Charge le modèle Parakeet v3 via NeMo."""
     global asr_model, ASR_MODE
     try:
         import nemo.collections.asr as nemo_asr
 
-        logger.info(f"Chargement du modèle {ASR_MODEL}...")
+        device = detect_device()
+        logger.info(f"Chargement du modèle {ASR_MODEL} sur {device}...")
         asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=ASR_MODEL)
+
+        if device == "cuda":
+            asr_model = asr_model.cuda()
+        elif device == "mps":
+            import torch
+            asr_model = asr_model.to(torch.device("mps"))
+
         ASR_MODE = "parakeet"
-        logger.info(f"Modèle {ASR_MODEL} chargé — mode parakeet actif")
+        logger.info(f"Modèle {ASR_MODEL} chargé sur {device} — mode parakeet actif")
     except Exception as e:
         logger.warning(f"Impossible de charger Parakeet: {e}")
         if ASR_MODE == "parakeet":
