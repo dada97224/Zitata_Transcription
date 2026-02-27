@@ -25,6 +25,12 @@ services:
       timeout: 5s
       retries: 5
 
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    ports:
+      - "4416:4416"
+    restart: unless-stopped
+
   asr:
     build: ./asr
     ports:
@@ -40,6 +46,8 @@ services:
       DATABASE_URL: postgres://zitata:zitata_dev@db:5432/zitata
       REDIS_URL: redis://redis:6379
       ASR_URL: http://asr:8001
+      POT_PROVIDER_URL: http://pot-provider:4416
+      YT_COOKIES_PATH: ${YT_COOKIES_PATH:-}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
       YOUTUBE_CHANNEL_ID: ${YOUTUBE_CHANNEL_ID:-}
       DOWNLOAD_DIR: /app/downloads
@@ -51,8 +59,11 @@ services:
         condition: service_healthy
       asr:
         condition: service_started
+      pot-provider:
+        condition: service_started
     volumes:
       - shared_downloads:/app/downloads
+      - ./cookies:/app/cookies:ro
 
   frontend:
     build: ./frontend

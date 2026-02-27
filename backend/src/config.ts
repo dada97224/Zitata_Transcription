@@ -10,4 +10,6 @@ export const config = {
   youtubeApiKey: process.env.YOUTUBE_API_KEY || "",
   youtubeChannelId: process.env.YOUTUBE_CHANNEL_ID || "",
   downloadDir: process.env.DOWNLOAD_DIR || "/tmp/youtube-downloads",
+  potProviderUrl: process.env.POT_PROVIDER_URL || "http://localhost:4416",
+  ytCookiesPath: process.env.YT_COOKIES_PATH || "",
 };

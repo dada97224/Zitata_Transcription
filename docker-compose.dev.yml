@@ -25,5 +25,11 @@ services:
       timeout: 5s
       retries: 5
 
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    ports:
+      - "4416:4416"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
