@@ -1,12 +1,14 @@
 import { Worker } from "bullmq";
-import IORedis from "ioredis";
 import { config } from "../config";
 import { pool } from "../db";
 
+function parseRedisUrl(url: string) {
+  const parsed = new URL(url);
+  return { host: parsed.hostname || "localhost", port: parseInt(parsed.port || "6379") };
+}
+
 export function startWorker(): void {
-  const connection = new IORedis(config.redisUrl, {
-    maxRetriesPerRequest: null,
-  });
+  const connection = parseRedisUrl(config.redisUrl);
 
   const worker = new Worker(
     "transcribe-youtube",

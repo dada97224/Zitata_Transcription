@@ -2,15 +2,16 @@ import { Router, Request, Response } from "express";
 import { pool } from "../db";
 import { config } from "../config";
 import { Queue } from "bullmq";
-import IORedis from "ioredis";
 
 const router = Router();
 
-const redisConnection = new IORedis(config.redisUrl, {
-  maxRetriesPerRequest: null,
-});
+function parseRedisUrl(url: string) {
+  const parsed = new URL(url);
+  return { host: parsed.hostname || "localhost", port: parseInt(parsed.port || "6379") };
+}
+
 const transcribeQueue = new Queue("transcribe-youtube", {
-  connection: redisConnection,
+  connection: parseRedisUrl(config.redisUrl),
 });
 
 router.post("/import-channel", async (_req: Request, res: Response) => {
