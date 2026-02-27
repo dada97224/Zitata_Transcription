@@ -37,3 +37,5 @@ Monorepo avec 5 services Docker :
 - Le service ASR est en mode **mock** en dev : il retourne des segments simulés. En production, remplacer par Parakeet v3.
 - `YOUTUBE_API_KEY` et `YOUTUBE_CHANNEL_ID` sont optionnels en dev ; utiliser `POST /youtube/seed` pour injecter des données de test.
 - La recherche full-text utilise la configuration `french` de PostgreSQL. Les requêtes ILIKE servent de fallback pour les termes non indexés.
+- **yt-dlp et YouTube** : en environnement headless (Cloud Agent, CI), YouTube bloque le téléchargement audio avec `Sign in to confirm you're not a bot`. Il faut fournir des cookies via `--cookies` ou `--cookies-from-browser`. En dev local avec navigateur, exporter les cookies YouTube dans un fichier `cookies.txt` et configurer le worker. Sans cela, utiliser `POST /youtube/seed` pour injecter des données de test avec segments pré-remplis.
+- Le backend doit être lancé avec `PATH` incluant `/home/ubuntu/.local/bin` pour que `yt-dlp` et `uvicorn` soient accessibles (pip installe dans `~/.local/bin`).
