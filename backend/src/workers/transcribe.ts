@@ -20,6 +20,8 @@ function buildYtDlpCommand(videoId: string, audioPath: string): string {
 
   if (config.ytCookiesPath) {
     parts.splice(3, 0, `--cookies "${config.ytCookiesPath}"`);
+  } else {
+    parts.splice(3, 0, "--cookies-from-browser chrome");
   }
 
   parts.push(`"https://www.youtube.com/watch?v=${videoId}"`);
