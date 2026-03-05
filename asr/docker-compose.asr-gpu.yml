@@ -1,0 +1,25 @@
+services:
+  asr:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    ports:
+      - "8001:8001"
+    environment:
+      ASR_MODE: parakeet
+      ASR_MODEL: Archime/parakeet-tdt-0.6b-v3-fr-tv-media
+    volumes:
+      - asr_cache:/root/.cache/huggingface
+      - asr_downloads:/app/downloads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  asr_cache:
+  asr_downloads:

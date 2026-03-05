@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: zitata_transcription
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Zitataadmin-972
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    ports:
+      - "4416:4416"
+    restart: unless-stopped
+
+  asr:
+    build: ./asr
+    ports:
+      - "8001:8001"
+    volumes:
+      - shared_downloads:/app/downloads
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgres://postgres:Zitataadmin-972@db:5432/zitata_transcription
+      REDIS_URL: redis://redis:6379
+      ASR_URL: ${ASR_URL:-http://asr:8001}
+      POT_PROVIDER_URL: http://pot-provider:4416
+      YT_COOKIES_PATH: ${YT_COOKIES_PATH:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      YOUTUBE_CHANNEL_ID: ${YOUTUBE_CHANNEL_ID:-}
+      DOWNLOAD_DIR: /app/downloads
+      PORT: "3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      asr:
+        condition: service_started
+      pot-provider:
+        condition: service_started
+    volumes:
+      - shared_downloads:/app/downloads
+      - ./cookies:/app/cookies:ro
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  shared_downloads:

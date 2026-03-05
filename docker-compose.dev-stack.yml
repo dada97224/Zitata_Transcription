@@ -1,0 +1,128 @@
+# Stack complète en Docker avec rechargement du code (backend + frontend)
+# Utilisation : docker compose -f docker-compose.dev-stack.yml up -d
+# Les modifs dans backend/ et frontend/ sont prises en compte sans rebuild.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: zitata_transcription
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Zitataadmin-972
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    ports:
+      - "4416:4416"
+    restart: unless-stopped
+
+  # ASR avec GPU (RTX 4060 Ti) — Docker Desktop doit exposer le GPU (nvidia-smi dans un conteneur OK)
+  # Premier démarrage : chargement du modèle peut prendre 5–10 min.
+  asr:
+    build:
+      context: ./asr
+      dockerfile: Dockerfile.gpu
+    image: zitata_transcription-asr:gpu
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      ASR_MODE: parakeet
+      ASR_MODEL: Archime/parakeet-tdt-0.6b-v3-fr-tv-media
+      NVIDIA_VISIBLE_DEVICES: all
+      # ASR_CUDA_MEMORY_FRACTION, ASR_CHUNK_DURATION_SEC, ASR_CHUNK_OVERLAP_SEC : lus depuis .env (pas d’override ici)
+    volumes:
+      - asr_hf_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          memory: 14G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:Zitataadmin-972@db:5432/zitata_transcription
+      REDIS_URL: redis://redis:6379
+      ASR_URL: http://asr:8001
+      POT_PROVIDER_URL: http://pot-provider:4416
+      DOWNLOAD_DIR: /app/downloads
+      PORT: "3001"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+      # Téléchargements visibles sur l'hôte : backend/downloads (pas de volume partagé avec l'ASR)
+      - ./backend/downloads:/app/downloads
+      - ./cookies:/app/cookies:ro
+    command: npx tsx watch src/index.ts
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      asr:
+        condition: service_started
+      pot-provider:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - /app/.next
+    command: npm run dev
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  frontend_node_modules:
+  asr_hf_cache:
